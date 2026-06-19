@@ -1216,15 +1216,14 @@ src="https://www.facebook.com/tr?id=1039428545090375&ev=PageView&noscript=1"
         trackingDomain: "rrbrh.ttrk.io",
         eventType: "InitiateCheckout",
         cookieName: "rtkclickid-store",
-        clickParam: "rtkcid",
+        clickParams: ["subid", "rtkcid", "clickid"], // BuyGoods usa subid
         clickSelector: "a, button",
         clickPathMatch: "/click",
         storageKey: "rtk_ic_fired",
-        debug: true   // <<< LIGADO para diagnostico
+        debug: true   // deixe true ate confirmar, depois troque pra false
     };
     // ========================
 
-    // Log de boot SEM gate de debug: confirma que o script executou
     console.log("[RT-IC] script carregado em", location.href);
 
     function log(msg) {
@@ -1235,14 +1234,19 @@ src="https://www.facebook.com/tr?id=1039428545090375&ev=PageView&noscript=1"
         return match ? decodeURIComponent(match[1]) : null;
     }
     function getClickId() {
+        // 1. Cookie (prioridade)
         var clickId = getCookie(CONFIG.cookieName);
         if (clickId) { log("clickId via cookie: " + clickId); return clickId; }
+        // 2. Parametros na URL (subid, rtkcid, clickid...)
         try {
             var params = new URLSearchParams(window.location.search);
-            clickId = params.get(CONFIG.clickParam);
-            if (clickId) { log("clickId via URL: " + clickId); return clickId; }
+            for (var i = 0; i < CONFIG.clickParams.length; i++) {
+                var p = CONFIG.clickParams[i];
+                var val = params.get(p);
+                if (val) { log("clickId via URL (" + p + "): " + val); return val; }
+            }
         } catch(e) {}
-        log("clickId NAO encontrado (sem cookie e sem param " + CONFIG.clickParam + ")");
+        log("clickId NAO encontrado (cookie + params: " + CONFIG.clickParams.join(", ") + ")");
         return null;
     }
     function isClickLink(url) {
@@ -1258,7 +1262,6 @@ src="https://www.facebook.com/tr?id=1039428545090375&ev=PageView&noscript=1"
         catch(e) {}
     }
     function send(url) {
-        // 1. fetch GET com keepalive: sobrevive a navegacao E usa GET (RedTrack espera GET)
         if (window.fetch) {
             try {
                 fetch(url, { method: "GET", mode: "no-cors", keepalive: true });
@@ -1266,7 +1269,6 @@ src="https://www.facebook.com/tr?id=1039428545090375&ev=PageView&noscript=1"
                 return;
             } catch(e) { log("fetch falhou, caindo pro pixel: " + e); }
         }
-        // 2. Fallback: pixel GET
         var img = new Image();
         img.src = url;
         log("postback via pixel GET: " + url);
