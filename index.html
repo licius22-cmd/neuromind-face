@@ -1211,43 +1211,37 @@ src="https://www.facebook.com/tr?id=1039428545090375&ev=PageView&noscript=1"
 <script>
 (function() {
     "use strict";
-
     // ===== CONFIGURACAO =====
     var CONFIG = {
         trackingDomain: "rrbrh.ttrk.io",
         eventType: "InitiateCheckout",
         cookieName: "rtkclickid-store",
         clickParam: "rtkcid",
-        clickPathMatch: "/click",
+        clickSelector: "a, button",   // dispara em clique em <a> ou <button>
+        clickPathMatch: "/click",     // tambem dispara em links com /click no path
         storageKey: "rtk_ic_fired",
         debug: false
     };
     // ========================
-
     function log(msg) {
         if (CONFIG.debug) console.log("[RT-IC]", msg);
     }
-
     function getCookie(name) {
         var match = document.cookie.match(new RegExp("(?:^|;\\s*)" + name + "=([^;]*)"));
         return match ? decodeURIComponent(match[1]) : null;
     }
-
     function getClickId() {
         // 1. Cookie (prioridade)
         var clickId = getCookie(CONFIG.cookieName);
         if (clickId) { log("clickId via cookie: " + clickId); return clickId; }
-
         // 2. Parametro na URL
         try {
             var params = new URLSearchParams(window.location.search);
             clickId = params.get(CONFIG.clickParam);
             if (clickId) { log("clickId via URL: " + clickId); return clickId; }
         } catch(e) {}
-
         return null;
     }
-
     function isClickLink(url) {
         try {
             return new URL(url).pathname.indexOf(CONFIG.clickPathMatch) !== -1;
@@ -1255,27 +1249,22 @@ src="https://www.facebook.com/tr?id=1039428545090375&ev=PageView&noscript=1"
             return false;
         }
     }
-
     function alreadyFired(clickId) {
         try { return sessionStorage.getItem(CONFIG.storageKey) === clickId; }
         catch(e) { return false; }
     }
-
     function markFired(clickId) {
         try { sessionStorage.setItem(CONFIG.storageKey, clickId); }
         catch(e) {}
     }
-
     function firePostback() {
         var clickId = getClickId();
         if (!clickId) { log("clickId nao encontrado"); return; }
         if (alreadyFired(clickId)) { log("ja disparado nesta sessao"); return; }
-
         var url = "https://" + CONFIG.trackingDomain
             + "/postback?clickid=" + encodeURIComponent(clickId)
             + "&type=" + encodeURIComponent(CONFIG.eventType);
-
-        // Usa sendBeacon (mais confiavel em navegacao) com fallback para pixel
+        // sendBeacon (mais confiavel em navegacao) com fallback para pixel
         if (navigator.sendBeacon) {
             navigator.sendBeacon(url);
             log("postback via beacon: " + url);
@@ -1284,21 +1273,21 @@ src="https://www.facebook.com/tr?id=1039428545090375&ev=PageView&noscript=1"
             img.src = url;
             log("postback via pixel: " + url);
         }
-
         markFired(clickId);
     }
-
     function handleClick(e) {
-        var anchor = e.target.closest ? e.target.closest("a[href]") : null;
-        if (!anchor) return;
-        if (isClickLink(anchor.href)) firePostback();
+        if (!e.target.closest) return;
+        // Gatilho 1: clique em <a> ou <button>
+        var el = e.target.closest(CONFIG.clickSelector);
+        if (el) { firePostback(); return; }
+        // Gatilho 2: clique em link com /click no path
+        var anchor = e.target.closest("a[href]");
+        if (anchor && isClickLink(anchor.href)) firePostback();
     }
-
     function init() {
         document.addEventListener("click", handleClick, true);
-        log("inicializado - escutando cliques em links /click");
+        log("inicializado - escutando <a>, <button> e links /click");
     }
-
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", init);
     } else {
